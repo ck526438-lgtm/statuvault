@@ -39,7 +39,8 @@ jobs:
 
   ios:
     name: IPA iOS (non signée)
-    runs-on: macos-latest
+    runs-on: macos-15
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -64,17 +65,23 @@ jobs:
         with:
           name: ios
           path: Statuvault-unsigned.ipa
+      - name: Ajouter l'IPA à la version
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Statuvault v1.0.${{ github.run_number }}
+          files: Statuvault-unsigned.ipa
 
   release:
     name: Publier la version
-    needs: [android, ios]
-    if: always() && needs.android.result == 'success'
+    needs: [android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
+          name: android
           path: out
-          merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
