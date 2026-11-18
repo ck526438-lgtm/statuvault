@@ -1,0 +1,11 @@
+# Généré en CI par `flutter create` + tool/patch_platforms.py
+/android/
+/ios/
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+.idea/
+*.iml
+.DS_Store

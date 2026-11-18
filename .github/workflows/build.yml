@@ -1,0 +1,85 @@
+name: Build Statuvault
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    name: APK Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Générer le projet Android
+        run: flutter create --org com.statuvault --project-name statuvault --platforms=android,ios .
+      - name: Appliquer les réglages Statuvault
+        run: python3 tool/patch_platforms.py
+      - run: flutter pub get
+      - name: Icônes
+        run: dart run flutter_launcher_icons
+      - name: Compiler l'APK
+        run: flutter build apk --release
+      - run: cp build/app/outputs/flutter-apk/app-release.apk Statuvault.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: Statuvault.apk
+
+  ios:
+    name: IPA iOS (non signée)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Générer le projet iOS
+        run: flutter create --org com.statuvault --project-name statuvault --platforms=android,ios .
+      - name: Appliquer les réglages Statuvault
+        run: python3 tool/patch_platforms.py
+      - run: flutter pub get
+      - name: Icônes
+        run: dart run flutter_launcher_icons
+      - name: Compiler l'app iOS
+        run: flutter build ios --release --no-codesign
+      - name: Emballer l'IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qr Statuvault-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios
+          path: Statuvault-unsigned.ipa
+
+  release:
+    name: Publier la version
+    needs: [android, ios]
+    if: always() && needs.android.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Statuvault v1.0.${{ github.run_number }}
+          files: out/*
+          body: |
+            **Android** : télécharge `Statuvault.apk` et installe-le (autorise les sources inconnues).
+            **iPhone** : `Statuvault-unsigned.ipa` s'installe avec AltStore ou Sideloadly (pas de signature Apple).
